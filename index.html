@@ -13,17 +13,22 @@
   <body>
     <main class="app-shell">
       <header class="site-header" aria-label="Cabeçalho">
-        <a class="brand" href="#inicio" aria-label="Marcos, início"><span class="brand-mark">m</span>marcos</a>
-        <button class="quiet-button restart-button" type="button" data-action="restart" hidden>Nova avaliação</button>
+        <a class="brand" href="#inicio" data-action="brand" aria-label="Marcos, início"><span class="brand-mark">m</span>marcos</a>
+        <nav class="header-actions" id="header-actions" aria-label="Ações principais"></nav>
       </header>
 
+      <div id="toast-region" class="toast-region" aria-live="assertive"></div>
       <section id="app" aria-live="polite"></section>
 
       <footer class="site-footer">
         <p>Baseado nos checklists “Learn the Signs. Act Early.” do CDC, em português.</p>
-        <p>Ferramenta de acompanhamento. Não substitui avaliação, triagem ou orientação profissional.</p>
+        <p>Ferramenta de acompanhamento clínico e familiar. Não substitui avaliação, triagem ou diagnóstico profissional.</p>
       </footer>
     </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+    <script src="./config.js"></script>
+    <script src="./milestones.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
