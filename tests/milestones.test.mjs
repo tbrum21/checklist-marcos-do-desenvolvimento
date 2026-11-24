@@ -90,3 +90,12 @@ test("index.html references all required scripts and DOM mount points", () => {
   assert.match(html, /id="toast-region"/);
   assert.match(html, /id="app"/);
 });
+
+test("app.js enforces login-only auth, superadmin panel, and first-access password change", () => {
+  const js = fs.readFileSync(path.resolve("app.js"), "utf8");
+  assert.doesNotMatch(js, /auth\.signUp\(/, "Self-signup must not exist in frontend");
+  assert.match(js, /function renderSuperadmin\(/);
+  assert.match(js, /function renderChangePassword\(/);
+  assert.match(js, /must_change_password/);
+  assert.match(js, /admin_create_professional/);
+});

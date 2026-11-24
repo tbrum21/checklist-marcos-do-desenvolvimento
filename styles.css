@@ -168,6 +168,23 @@ input:focus, select:focus, textarea:focus { border-color: var(--violet); box-sha
 .assessment-sub { color: var(--muted); font-size: 13px; }
 .assessment-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* Superadmin credentials callout & list */
+.credentials-box { padding: 22px 24px; margin-bottom: 24px; border-radius: 20px; border: 1px solid #8bd4b3; background: var(--green-bg); color: #124c36; }
+.credentials-box h3 { margin: 0 0 6px; color: #0f4430; }
+.credentials-box p { margin: 0 0 14px; font-size: 14px; line-height: 1.45; }
+.credentials-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.credential-item { padding: 12px 14px; border-radius: 12px; background: #fff; border: 1px solid #c5ead8; }
+.credential-item small { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
+.credential-item code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; font-weight: 700; color: var(--ink); word-break: break-all; }
+.pro-list { display: grid; gap: 12px; margin-top: 14px; }
+.pro-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 18px 20px; border-radius: 18px; background: #fff; border: 1px solid var(--line); }
+.pro-row.inactive { opacity: .68; background: #fafbfe; }
+.pro-info { display: grid; gap: 5px; }
+.pro-name { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pro-sub { color: var(--muted); font-size: 13px; }
+.pro-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 700px) { .credentials-grid { grid-template-columns: 1fr; } }
+
 /* Checklist & Result (existing design preserved) */
 .checklist-top { display: flex; gap: 20px; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
 .progress-copy { color: var(--muted); font-size: 13px; text-align: right; white-space: nowrap; }
