@@ -119,6 +119,9 @@ test("landing page includes SEO metadata, interactive age explorer and lead capt
   assert.doesNotMatch(js, /id="planos"/);
   assert.doesNotMatch(js, /R\$\s*\d+/);
   assert.doesNotMatch(js, /teste gratuito/i);
+  assert.doesNotMatch(html, /start-guest/);
+  assert.doesNotMatch(js, /start-guest/);
+  assert.match(js, /!state\.user && !\["home", "auth"\]\.includes\(state\.screen\)/);
   assert.match(js, /id="seguranca"/);
   assert.match(js, /access_leads/);
 });

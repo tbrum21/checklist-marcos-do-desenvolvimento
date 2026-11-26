@@ -389,7 +389,6 @@ function renderHeader() {
     return;
   }
 
-  const showRestart = ["profile", "checklist", "context", "result"].includes(state.screen);
   const isHome = state.screen === "home";
   headerActions.innerHTML = `
     ${
@@ -404,7 +403,6 @@ function renderHeader() {
           <button class="primary-button small-btn" type="button" data-open-lead="Consultório Individual">Solicitar acesso</button>
         `
         : `
-          ${showRestart ? `<button class="quiet-button" type="button" data-action="restart">Nova avaliação</button>` : ""}
           ${state.screen !== "auth" ? `<button class="secondary-button small-btn" type="button" data-action="go-auth">Entrar</button>` : `<button class="quiet-button" type="button" data-action="home">Voltar ao início</button>`}
         `
     }
@@ -412,6 +410,9 @@ function renderHeader() {
 }
 
 function render() {
+  if (!state.user && !["home", "auth"].includes(state.screen)) {
+    state.screen = "auth";
+  }
   if (requiresPasswordChange() && state.screen !== "change-password") {
     state.screen = "change-password";
   }
@@ -468,8 +469,8 @@ function buildLpExplorerHtml(ageMonths) {
         <h3>Checklist de ${escapeHtml(label)} · ${totalCount} marcos mapeados</h3>
         <p>Referência CDC “Learn the Signs. Act Early.” organizada nos 4 domínios do neurodesenvolvimento.</p>
       </div>
-      <button class="primary-button small-btn" type="button" data-start-guest-age="${numericAge}">
-        Aplicar checklist de ${escapeHtml(label)} agora →
+      <button class="primary-button small-btn" type="button" data-open-lead="Consultório Individual">
+        Solicitar acesso para aplicar →
       </button>
     </div>
     <div class="lp-explorer-grid">
@@ -519,11 +520,11 @@ function renderHome() {
               </p>
               <div class="button-row">
                 <button class="primary-button lp-cta-lg" type="button" ${primaryAttr}>${primaryLabel}</button>
-                <button class="secondary-button lp-cta-lg" type="button" data-action="start-guest">Fazer avaliação demonstrativa</button>
+                <button class="secondary-button lp-cta-lg" type="button" data-lp-scroll="recursos">Conhecer recursos</button>
               </div>
               <ul class="lp-hero-checks" aria-label="Principais garantias">
                 <li>Baseado no CDC (Act Early)</li>
-                <li>Avaliação rápida sem cadastro</li>
+                <li>Acesso liberado pela administração</li>
                 <li>Sigilo e isolamento por CRP</li>
               </ul>
             </div>
@@ -865,11 +866,15 @@ function renderHome() {
             <p class="section-label">Comece hoje mesmo</p>
             <h2>Leve mais clareza para o acompanhamento das famílias que você atende.</h2>
             <p class="lead">
-              Experimente a avaliação demonstrativa agora ou solicite seu acesso profissional para organizar toda a evolução clínica dos seus pacientes.
+              Solicite seu acesso profissional para organizar toda a evolução clínica dos seus pacientes ou entre com suas credenciais.
             </p>
             <div class="button-row">
               <button class="primary-button lp-cta-lg" type="button" ${primaryAttr}>${primaryLabel}</button>
-              <button class="secondary-button lp-cta-lg" type="button" data-action="start-guest">Fazer avaliação demonstrativa</button>
+              ${
+                isLogged
+                  ? ""
+                  : `<button class="secondary-button lp-cta-lg" type="button" data-action="go-auth">Já tenho acesso (Entrar)</button>`
+              }
             </div>
           </div>
         </div>
@@ -2213,7 +2218,11 @@ async function handleAction(action) {
     render();
     return;
   }
-  if (action === "start-guest") { resetAssessmentDraft(null); state.screen = "profile"; render(); return; }
+  if (["new-patient", "back-patient-detail", "profile", "checklist", "context", "result", "restart"].includes(action) && !state.user) {
+    state.screen = "auth";
+    render();
+    return;
+  }
   if (action === "new-patient") { state.editingPatientId = null; state.screen = "patient-form"; render(); return; }
   if (action === "back-patient-detail") { state.screen = "patient-detail"; render(); return; }
   if (action === "profile") { state.screen = "profile"; render(); return; }
@@ -2311,16 +2320,6 @@ document.addEventListener("click", (event) => {
   if (lpAge) {
     state.lpSelectedAge = Number(lpAge.dataset.lpAge) || 24;
     updateLpExplorer();
-    return;
-  }
-
-  const startGuestAge = event.target.closest("[data-start-guest-age]");
-  if (startGuestAge) {
-    resetAssessmentDraft(null);
-    state.age = String(startGuestAge.dataset.startGuestAge);
-    state.screen = "profile";
-    render();
-    window.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
 
