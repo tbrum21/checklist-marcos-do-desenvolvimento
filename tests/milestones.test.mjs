@@ -100,7 +100,7 @@ test("app.js enforces login-only auth, superadmin panel, and first-access passwo
   assert.match(js, /admin_create_professional/);
 });
 
-test("landing page includes SEO metadata, interactive age explorer, pricing and lead capture modal", () => {
+test("landing page includes SEO metadata, interactive age explorer and lead capture modal without pricing/free-trial", () => {
   const html = fs.readFileSync(path.resolve("index.html"), "utf8");
   const css = fs.readFileSync(path.resolve("styles.css"), "utf8");
   const js = fs.readFileSync(path.resolve("app.js"), "utf8");
@@ -116,7 +116,9 @@ test("landing page includes SEO metadata, interactive age explorer, pricing and 
   assert.equal(openBraces, closeBraces, "CSS braces must be balanced");
   assert.match(js, /function buildLpExplorerHtml\(/);
   assert.match(js, /function openLeadModal\(/);
-  assert.match(js, /id="planos"/);
+  assert.doesNotMatch(js, /id="planos"/);
+  assert.doesNotMatch(js, /R\$\s*\d+/);
+  assert.doesNotMatch(js, /teste gratuito/i);
   assert.match(js, /id="seguranca"/);
   assert.match(js, /access_leads/);
 });

@@ -398,7 +398,6 @@ function renderHeader() {
           <div class="header-nav-links">
             <a class="nav-link" href="#recursos" data-lp-scroll="recursos">Recursos</a>
             <a class="nav-link" href="#checklists" data-lp-scroll="checklists">Checklists</a>
-            <a class="nav-link" href="#planos" data-lp-scroll="planos">Planos</a>
             <a class="nav-link" href="#seguranca" data-lp-scroll="seguranca">Segurança</a>
           </div>
           <button class="secondary-button small-btn" type="button" data-action="go-auth">Entrar</button>
@@ -524,7 +523,7 @@ function renderHome() {
               </div>
               <ul class="lp-hero-checks" aria-label="Principais garantias">
                 <li>Baseado no CDC (Act Early)</li>
-                <li>Teste gratuito sem cadastro</li>
+                <li>Avaliação rápida sem cadastro</li>
                 <li>Sigilo e isolamento por CRP</li>
               </ul>
             </div>
@@ -783,85 +782,8 @@ function renderHome() {
         </div>
       </section>
 
-      <!-- 6. PLANOS E MONETIZAÇÃO -->
-      <section class="lp-band tint" id="planos">
-        <div class="lp-container">
-          <div class="lp-section-head centered">
-            <p class="section-label">Planos e acesso profissional</p>
-            <h2>Comece testando gratuitamente. Evolua quando seu consultório precisar.</h2>
-            <p class="lead">
-              Transparência desde o primeiro dia. Solicite seu acesso profissional e tenha seu ambiente liberado com onboarding guiado.
-            </p>
-          </div>
-
-          <div class="lp-pricing-grid">
-            <article class="lp-plan-card">
-              <div>
-                <h3 class="lp-plan-name">Avaliação Avulsa</h3>
-                <p class="lp-plan-desc">Ideal para conhecer a metodologia ou aplicar uma avaliação rápida sem salvar histórico.</p>
-                <div class="lp-plan-price">
-                  <strong>R$ 0</strong>
-                  <span>/ sempre gratuito</span>
-                </div>
-                <p class="lp-plan-note">Sem cadastro e sem cartão</p>
-                <ul class="lp-plan-features">
-                  <li>Acesso às 12 faixas etárias (2m a 5 anos)</li>
-                  <li>Cálculo imediato por domínio</li>
-                  <li>Resumo imprimível em PDF</li>
-                  <li>Compartilhamento formatado no WhatsApp</li>
-                </ul>
-              </div>
-              <button class="secondary-button" type="button" data-action="start-guest">Fazer avaliação agora</button>
-            </article>
-
-            <article class="lp-plan-card featured">
-              <span class="lp-plan-badge">Mais escolhido · Acesso Fundador</span>
-              <div>
-                <h3 class="lp-plan-name">Consultório Individual</h3>
-                <p class="lp-plan-desc">Para psicólogos(as), neuropsicólogos, fonoaudiólogos e terapeutas infantis.</p>
-                <div class="lp-plan-price">
-                  <strong>R$ 59</strong>
-                  <span>/ mês</span>
-                </div>
-                <p class="lp-plan-note">Condição de lançamento · 7 dias de teste guiado</p>
-                <ul class="lp-plan-features">
-                  <li>Pacientes e avaliações ilimitados em nuvem</li>
-                  <li>Linha do tempo longitudinal por criança</li>
-                  <li>Comparativo automático de marcos conquistados</li>
-                  <li>Gráficos por área do desenvolvimento</li>
-                  <li>Identificação com seu CRP e isolamento RLS</li>
-                  <li>Arquivamento, busca e edição de histórico</li>
-                </ul>
-              </div>
-              <button class="primary-button" type="button" data-open-lead="Consultório Individual (R$ 59/mês)">Solicitar acesso fundador</button>
-            </article>
-
-            <article class="lp-plan-card">
-              <div>
-                <h3 class="lp-plan-name">Clínica & Equipe</h3>
-                <p class="lp-plan-desc">Para clínicas multidisciplinares e equipes de intervenção precoce ou ABA.</p>
-                <div class="lp-plan-price">
-                  <strong>R$ 199</strong>
-                  <span>/ mês (até 5 prof.)</span>
-                </div>
-                <p class="lp-plan-note">Planos maiores sob medida</p>
-                <ul class="lp-plan-features">
-                  <li>Tudo do plano Consultório Individual</li>
-                  <li>Painel administrativo para gestão da equipe</li>
-                  <li>Criação, bloqueio e redefinição de acessos</li>
-                  <li>Troca obrigatória de senha no 1º login</li>
-                  <li>Padronização das devolutivas da clínica</li>
-                  <li>Suporte prioritário no onboarding</li>
-                </ul>
-              </div>
-              <button class="secondary-button" type="button" data-open-lead="Clínica & Equipe (R$ 199/mês)">Falar sobre plano clínica</button>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <!-- 7. ÉTICA CLÍNICA, SEGURANÇA & FAQ -->
-      <section class="lp-band white" id="seguranca">
+      <!-- 6. ÉTICA CLÍNICA, SEGURANÇA & FAQ -->
+      <section class="lp-band tint" id="seguranca">
         <div class="lp-container">
           <div class="lp-section-head centered">
             <p class="section-label">Ética, privacidade & confiança</p>
@@ -914,7 +836,7 @@ function renderHome() {
                 </div>
               </details>
               <details class="lp-faq-item">
-                <summary>Como funciona a liberação do meu acesso após solicitar o plano?</summary>
+                <summary>Como funciona a liberação do meu acesso profissional?</summary>
                 <div class="lp-faq-answer">
                   Após preencher a solicitação de acesso profissional, nossa equipe entra em contato rapidamente para ativar sua conta. Você recebe seu login com senha temporária e, no primeiro acesso, define imediatamente sua senha definitiva pessoal para começar a cadastrar seus pacientes.
                 </div>
@@ -947,7 +869,7 @@ function renderHome() {
             </p>
             <div class="button-row">
               <button class="primary-button lp-cta-lg" type="button" ${primaryAttr}>${primaryLabel}</button>
-              <button class="secondary-button lp-cta-lg" type="button" data-action="start-guest">Testar avaliação gratuita</button>
+              <button class="secondary-button lp-cta-lg" type="button" data-action="start-guest">Fazer avaliação demonstrativa</button>
             </div>
           </div>
         </div>
@@ -964,7 +886,7 @@ function buildLeadWhatsappText(lead) {
     `• WhatsApp: ${lead.whatsapp}`,
     lead.professional_registry ? `• Registro profissional: ${lead.professional_registry}` : null,
     `• Área de atuação: ${lead.specialty}`,
-    `• Plano de interesse: ${lead.plan_interest}`,
+    `• Perfil de uso: ${lead.plan_interest}`,
     lead.notes ? `• Observações: ${lead.notes}` : null
   ]
     .filter(Boolean)
@@ -1017,7 +939,7 @@ function renderLeadModal() {
               <div class="lp-modal-success">
                 <div class="lp-modal-success-icon" aria-hidden="true">✓</div>
                 <p class="lead" style="margin:0 auto 14px;font-size:15.5px">
-                  Obrigado, <strong>${escapeHtml(submitted.full_name)}</strong>! Recebemos seu interesse no plano <strong>${escapeHtml(submitted.plan_interest)}</strong>.
+                  Obrigado, <strong>${escapeHtml(submitted.full_name)}</strong>! Recebemos sua solicitação de acesso para <strong>${escapeHtml(submitted.plan_interest)}</strong>.
                 </p>
                 <p class="hint" style="margin-bottom:22px">
                   ${submitted.savedToDb ? "Seus dados já foram registrados para nossa equipe liberar seu acesso e senha inicial." : "Você pode enviar o resumo da solicitação abaixo para agilizar a liberação imediata da sua conta."}
@@ -1031,7 +953,7 @@ function renderLeadModal() {
             `
             : `
               <p class="hint" style="margin:-8px 0 18px">
-                Preencha seus dados para receber seu acesso com <strong>7 dias de teste guiado</strong> e senha inicial configurada para o seu consultório.
+                Preencha seus dados para solicitar seu acesso profissional e receber sua senha inicial configurada para o consultório.
               </p>
               ${feedbackHtml}
               <form id="lead-request-form" class="form-stack">
@@ -1062,10 +984,10 @@ function renderLeadModal() {
                     </select>
                   </div>
                   <div class="field full">
-                    <label for="lead-plan">Plano de interesse</label>
+                    <label for="lead-plan">Perfil de uso</label>
                     <select id="lead-plan">
-                      <option value="Consultório Individual (R$ 59/mês)" ${state.leadPlan.includes("Individual") ? "selected" : ""}>Consultório Individual — R$ 59/mês (Acesso Fundador)</option>
-                      <option value="Clínica & Equipe (R$ 199/mês)" ${state.leadPlan.includes("Clínica") ? "selected" : ""}>Clínica & Equipe — a partir de R$ 199/mês</option>
+                      <option value="Consultório Individual" ${state.leadPlan.includes("Individual") ? "selected" : ""}>Consultório Individual</option>
+                      <option value="Clínica & Equipe" ${state.leadPlan.includes("Clínica") ? "selected" : ""}>Clínica & Equipe</option>
                     </select>
                   </div>
                   <div class="field full">
