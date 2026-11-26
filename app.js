@@ -19,6 +19,7 @@ const supabaseClient =
 const app = document.querySelector("#app");
 const headerActions = document.querySelector("#header-actions");
 const toastRegion = document.querySelector("#toast-region");
+const modalRoot = document.querySelector("#modal-root");
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -30,8 +31,16 @@ const state = {
   profile: null,
   authFeedback: null,
   passwordFeedback: null,
+  // Landing page & lead capture state
+  lpSelectedAge: 24,
+  leadModalOpen: false,
+  leadPlan: "Consultório Individual",
+  leadSubmitting: false,
+  leadSubmitted: null,
+  leadError: null,
   // Superadmin state
   professionals: [],
+  leads: [],
   adminLoading: false,
   adminFeedback: null,
   lastCredentials: null,
@@ -201,6 +210,18 @@ async function loadSuperadminData() {
   } catch (err) {
     state.adminFeedback = { type: "error", message: err.message };
   }
+  try {
+    const leadsRes = await supabaseClient
+      .from("access_leads")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (!leadsRes.error && Array.isArray(leadsRes.data)) {
+      state.leads = leadsRes.data;
+    }
+  } catch {
+    // Tabela opcional access_leads ainda não migrada; segue normalmente.
+  }
   state.adminLoading = false;
   render();
 }
@@ -369,9 +390,25 @@ function renderHeader() {
   }
 
   const showRestart = ["profile", "checklist", "context", "result"].includes(state.screen);
+  const isHome = state.screen === "home";
   headerActions.innerHTML = `
-    ${showRestart ? `<button class="quiet-button" type="button" data-action="restart">Nova avaliação</button>` : ""}
-    ${state.screen !== "auth" ? `<button class="secondary-button small-btn" type="button" data-action="go-auth">Entrar</button>` : `<button class="quiet-button" type="button" data-action="home">Voltar ao início</button>`}
+    ${
+      isHome
+        ? `
+          <div class="header-nav-links">
+            <a class="nav-link" href="#recursos" data-lp-scroll="recursos">Recursos</a>
+            <a class="nav-link" href="#checklists" data-lp-scroll="checklists">Checklists</a>
+            <a class="nav-link" href="#planos" data-lp-scroll="planos">Planos</a>
+            <a class="nav-link" href="#seguranca" data-lp-scroll="seguranca">Segurança</a>
+          </div>
+          <button class="secondary-button small-btn" type="button" data-action="go-auth">Entrar</button>
+          <button class="primary-button small-btn" type="button" data-open-lead="Consultório Individual">Solicitar acesso</button>
+        `
+        : `
+          ${showRestart ? `<button class="quiet-button" type="button" data-action="restart">Nova avaliação</button>` : ""}
+          ${state.screen !== "auth" ? `<button class="secondary-button small-btn" type="button" data-action="go-auth">Entrar</button>` : `<button class="quiet-button" type="button" data-action="home">Voltar ao início</button>`}
+        `
+    }
   `;
 }
 
@@ -379,7 +416,9 @@ function render() {
   if (requiresPasswordChange() && state.screen !== "change-password") {
     state.screen = "change-password";
   }
+  document.body.classList.toggle("is-landing", state.screen === "home");
   renderHeader();
+  renderLeadModal();
   if (state.screen === "home") return renderHome();
   if (state.screen === "auth") return renderAuth();
   if (state.screen === "change-password") return renderChangePassword();
@@ -394,40 +433,706 @@ function render() {
 }
 
 // ============================================================================
-// SCREENS: HOME, AUTH & CHANGE PASSWORD
+// SCREENS: HOME (PREMIUM LANDING PAGE), LEAD MODAL, AUTH & CHANGE PASSWORD
 // ============================================================================
 
+function buildLpExplorerHtml(ageMonths) {
+  const numericAge = Number(ageMonths) || 24;
+  const label = getAgeLabel(numericAge) || "2 anos";
+  const checklist = CHECKLISTS[numericAge] || {};
+  const totalCount = getMilestones(numericAge).length;
+
+  const domainCards = DOMAINS.map((domain) => {
+    const items = checklist[domain.key] || [];
+    const previewItems = items.slice(0, 3);
+    const remaining = items.length - previewItems.length;
+    return `
+      <article class="lp-domain-preview">
+        <div class="lp-domain-preview-head">
+          <div class="lp-domain-preview-title">
+            <span class="domain-dot" style="background:${domain.color}"></span>
+            <span>${domain.label}</span>
+          </div>
+          <span class="lp-domain-preview-count">${items.length} ${items.length === 1 ? "marco" : "marcos"}</span>
+        </div>
+        <ul>
+          ${previewItems.map((text) => `<li>${escapeHtml(text)}</li>`).join("")}
+          ${remaining > 0 ? `<li class="hint">+ ${remaining} ${remaining === 1 ? "outro marco" : "outros marcos"} nesta área</li>` : ""}
+        </ul>
+      </article>
+    `;
+  }).join("");
+
+  return `
+    <div class="lp-explorer-meta">
+      <div>
+        <h3>Checklist de ${escapeHtml(label)} · ${totalCount} marcos mapeados</h3>
+        <p>Referência CDC “Learn the Signs. Act Early.” organizada nos 4 domínios do neurodesenvolvimento.</p>
+      </div>
+      <button class="primary-button small-btn" type="button" data-start-guest-age="${numericAge}">
+        Aplicar checklist de ${escapeHtml(label)} agora →
+      </button>
+    </div>
+    <div class="lp-explorer-grid">
+      ${domainCards}
+    </div>
+  `;
+}
+
+function updateLpExplorer() {
+  const pills = document.querySelectorAll("[data-lp-age]");
+  pills.forEach((btn) => {
+    const isActive = Number(btn.dataset.lpAge) === Number(state.lpSelectedAge);
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+  const container = document.querySelector("#lp-explorer-content");
+  if (container) {
+    container.innerHTML = buildLpExplorerHtml(state.lpSelectedAge);
+  }
+}
+
 function renderHome() {
-  const primaryLabel = state.user
+  const isLogged = Boolean(state.user);
+  const primaryLabel = isLogged
     ? isSuperadmin()
       ? "Abrir painel Superadmin"
       : "Ir para meus pacientes"
-    : "Entrar como psicólogo(a)";
-  const primaryAction = state.user ? (isSuperadmin() ? "go-superadmin" : "go-dashboard") : "go-auth";
+    : "Quero usar no meu consultório";
+  const primaryAttr = isLogged
+    ? `data-action="${isSuperadmin() ? "go-superadmin" : "go-dashboard"}"`
+    : `data-open-lead="Consultório Individual"`;
 
   app.innerHTML = `
-    <section class="hero" id="inicio">
-      <div>
-        <p class="eyebrow">Acompanhamento do desenvolvimento infantil</p>
-        <h1>Pequenos passos.<br>Evolução registrada.</h1>
-        <p class="lead">Acompanhe marcos do desenvolvimento de cada paciente ao longo das consultas, compare avanços entre sessões e gere resumos claros para a família.</p>
-        <div class="button-row">
-          <button class="primary-button" type="button" data-action="${primaryAction}">${primaryLabel}</button>
-          <button class="secondary-button" type="button" data-action="start-guest">Avaliação rápida sem conta</button>
+    <div class="lp-root">
+      <!-- 1. HERO EXECUTIVO -->
+      <section class="lp-hero-band" id="inicio">
+        <div class="lp-container">
+          <div class="lp-hero">
+            <div class="lp-hero-copy">
+              <div class="lp-badge">
+                <span class="lp-badge-dot" aria-hidden="true"></span>
+                Plataforma Clínica · Desenvolvimento Infantil (0 a 5 anos)
+              </div>
+              <h1>Transforme observações clínicas em evolução visível.</h1>
+              <p class="lead">
+                Acompanhe os marcos do desenvolvimento de cada paciente sessão a sessão, compare conquistas automaticamente e entregue relatórios acolhedores em PDF ou WhatsApp para a família em menos de 3 minutos.
+              </p>
+              <div class="button-row">
+                <button class="primary-button lp-cta-lg" type="button" ${primaryAttr}>${primaryLabel}</button>
+                <button class="secondary-button lp-cta-lg" type="button" data-action="start-guest">Fazer avaliação demonstrativa</button>
+              </div>
+              <ul class="lp-hero-checks" aria-label="Principais garantias">
+                <li>Baseado no CDC (Act Early)</li>
+                <li>Teste gratuito sem cadastro</li>
+                <li>Sigilo e isolamento por CRP</li>
+              </ul>
+            </div>
+
+            <div class="lp-mockup-wrap" aria-label="Prévia da interface de acompanhamento longitudinal do paciente">
+              <div class="lp-mockup-card">
+                <div class="lp-mockup-topbar">
+                  <div class="lp-mockup-patient">
+                    <span class="lp-avatar" aria-hidden="true">SM</span>
+                    <div>
+                      <strong>Sofia Mendes</strong>
+                      <span>2 anos e 2 meses · Prontuário longitudinal</span>
+                    </div>
+                  </div>
+                  <span class="pill green">Em acompanhamento</span>
+                </div>
+
+                <p class="lp-mockup-section-title">Evolução entre sessões</p>
+                <div class="lp-mockup-timeline">
+                  <div class="lp-mockup-row">
+                    <div class="lp-mockup-row-head">
+                      <strong>26/11 · Checklist de 2 anos</strong>
+                      <span>11/13 observados (85%)</span>
+                    </div>
+                    <div class="stacked-bar" aria-hidden="true">
+                      <span class="seg-yes" style="width:85%"></span>
+                      <span class="seg-unsure" style="width:8%"></span>
+                      <span class="seg-no" style="width:7%"></span>
+                    </div>
+                  </div>
+                  <div class="lp-mockup-row">
+                    <div class="lp-mockup-row-head">
+                      <strong>14/08 · Checklist de 2 anos</strong>
+                      <span>8/13 observados (62%)</span>
+                    </div>
+                    <div class="stacked-bar" aria-hidden="true">
+                      <span class="seg-yes" style="width:62%"></span>
+                      <span class="seg-unsure" style="width:23%"></span>
+                      <span class="seg-no" style="width:15%"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="lp-mockup-delta">
+                  <span class="lp-delta-badge">+23 pts</span>
+                  <p><strong>3 novos marcos conquistados:</strong> aponta figuras em livros, combina duas palavras e sobe degraus com autonomia.</p>
+                </div>
+
+                <p class="lp-mockup-section-title">Desempenho por área</p>
+                <div class="lp-mockup-domains">
+                  <div class="lp-mini-domain">
+                    <div class="lp-mini-domain-head"><span>Social e emocional</span><span>100%</span></div>
+                    <div class="lp-mini-track"><div class="lp-mini-fill" style="width:100%;background:#db6fa7"></div></div>
+                  </div>
+                  <div class="lp-mini-domain">
+                    <div class="lp-mini-domain-head"><span>Linguagem</span><span>75%</span></div>
+                    <div class="lp-mini-track"><div class="lp-mini-fill" style="width:75%;background:#5e9eea"></div></div>
+                  </div>
+                  <div class="lp-mini-domain">
+                    <div class="lp-mini-domain-head"><span>Cognitivo</span><span>100%</span></div>
+                    <div class="lp-mini-track"><div class="lp-mini-fill" style="width:100%;background:#967ce5"></div></div>
+                  </div>
+                  <div class="lp-mini-domain">
+                    <div class="lp-mini-domain-head"><span>Motor e físico</span><span>75%</span></div>
+                    <div class="lp-mini-track"><div class="lp-mini-fill" style="width:75%;background:#45bfa8"></div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="lp-floating-chip">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                <span>Resumo PDF e WhatsApp prontos em 1 clique</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="hero-note">${icon("spark")}<span>O acesso profissional é gerenciado pela administração. No primeiro login com a senha temporária, o psicólogo define imediatamente sua senha pessoal.</span></div>
-      </div>
-      <div class="hero-art" aria-hidden="true">
-        <span class="orb one"></span>
-        <span class="orb two"></span>
-        <span class="orb three"></span>
-        <div class="hero-art-copy">
-          <span>Um registro de cada vez</span>
-          <strong>Acompanhe cada conquista no tempo certo.</strong>
+      </section>
+
+      <!-- 2. FAIXA DE CREDIBILIDADE -->
+      <section class="lp-trust-band" aria-label="Fundamentos da plataforma">
+        <div class="lp-container">
+          <div class="lp-trust-grid">
+            <div class="lp-trust-item">
+              <strong>12 faixas etárias</strong>
+              <span>Dos 2 meses aos 5 anos completos com sugestão automática pela data de nascimento.</span>
+            </div>
+            <div class="lp-trust-item">
+              <strong>4 domínios clínicos</strong>
+              <span>Social/emocional, linguagem, cognitivo e desenvolvimento motor integrados.</span>
+            </div>
+            <div class="lp-trust-item">
+              <strong>Guia CDC Act Early</strong>
+              <span>Referência internacional “Learn the Signs. Act Early.” adaptada em português claro.</span>
+            </div>
+            <div class="lp-trust-item">
+              <strong>Sigilo & RLS</strong>
+              <span>Cada profissional acessa exclusivamente seus pacientes com proteção em nível de banco.</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <!-- 3. ANTES VS. DEPOIS -->
+      <section class="lp-band white" id="como-funciona">
+        <div class="lp-container">
+          <div class="lp-section-head centered">
+            <p class="section-label">Da papelada à clareza clínica</p>
+            <h2>Chega de checklists soltos e devolutivas que consomem horas.</h2>
+            <p class="lead">
+              Mostre aos pais cada conquista concreta da criança e mantenha um registro longitudinal organizado para suas sessões e supervisões.
+            </p>
+          </div>
+          <div class="lp-contrast-grid">
+            <article class="lp-contrast-card before">
+              <span class="lp-contrast-tag">Modelo tradicional</span>
+              <h3>Sem um histórico estruturado</h3>
+              <ul class="lp-check-list">
+                <li><span class="lp-list-icon no" aria-hidden="true">×</span><span>Checklists impressos espalhados em pastas físicas ou planilhas difíceis de comparar entre meses.</span></li>
+                <li><span class="lp-list-icon no" aria-hidden="true">×</span><span>Dificuldade de tornar visíveis os avanços sutis para famílias ansiosas no início do acompanhamento.</span></li>
+                <li><span class="lp-list-icon no" aria-hidden="true">×</span><span>Retrabalho manual digitando resumos longos no WhatsApp ou montando relatórios após o expediente.</span></li>
+                <li><span class="lp-list-icon no" aria-hidden="true">×</span><span>Risco de perder sinais importantes de regressão de habilidades ou preocupações relatadas em sessões anteriores.</span></li>
+              </ul>
+            </article>
+            <article class="lp-contrast-card after">
+              <span class="lp-contrast-tag">Com o Marcos</span>
+              <h3>Consultório moderno e acolhedor</h3>
+              <ul class="lp-check-list">
+                <li><span class="lp-list-icon yes" aria-hidden="true">✓</span><span>Prontuário de desenvolvimento centralizado por criança com linha do tempo visual de cada sessão.</span></li>
+                <li><span class="lp-list-icon yes" aria-hidden="true">✓</span><span>Comparativo automático que calcula a evolução percentual e lista nominalmente os novos marcos conquistados.</span></li>
+                <li><span class="lp-list-icon yes" aria-hidden="true">✓</span><span>Devolutiva humanizada pronta ao final da consulta: salve em PDF limpo ou envie via WhatsApp em 1 clique.</span></li>
+                <li><span class="lp-list-icon yes" aria-hidden="true">✓</span><span>Registro dedicado para preocupações familiares, perda de habilidades e observações qualitativas da sessão.</span></li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. BENTO GRID DE RECURSOS -->
+      <section class="lp-band tint" id="recursos">
+        <div class="lp-container">
+          <div class="lp-section-head">
+            <p class="section-label">Feito para a rotina clínica</p>
+            <h2>Tudo o que você precisa para acompanhar, comparar e comunicar.</h2>
+            <p class="lead">
+              Desenhado para ser leve durante o atendimento em computador, tablet ou celular — sem distrações nem burocracia.
+            </p>
+          </div>
+
+          <div class="lp-bento">
+            <article class="lp-bento-card span-7">
+              <div>
+                <p class="section-label">Evolução longitudinal</p>
+                <h3>Comparativo inteligente entre sessões</h3>
+                <p>Ao reavaliar a criança na mesma faixa etária, o sistema destaca automaticamente o salto percentual e lista quais habilidades passaram a ser observadas.</p>
+              </div>
+              <div class="lp-bento-visual">
+                <div class="lp-gained-preview">
+                  <div class="lp-gained-chip">Diz pelo menos duas palavras juntas</div>
+                  <div class="lp-gained-chip">Aponta para figuras em um livro quando solicitado</div>
+                  <div class="lp-gained-chip">Chuta uma bola e sobe degraus com mais equilíbrio</div>
+                </div>
+              </div>
+            </article>
+
+            <article class="lp-bento-card dark span-5">
+              <div>
+                <p class="section-label">Devolutiva imediata</p>
+                <h3>Relatórios claros que encantam as famílias</h3>
+                <p>Gere uma folha de impressão limpa em PDF ou uma mensagem estruturada pronta para compartilhar no WhatsApp com os responsáveis.</p>
+              </div>
+              <div class="lp-bento-visual">
+                <div class="lp-export-pills">
+                  <span class="lp-export-pill accent">Salvar em PDF</span>
+                  <span class="lp-export-pill">Enviar via WhatsApp</span>
+                  <span class="lp-export-pill">Copiar resumo</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="lp-bento-card span-5">
+              <div>
+                <p class="section-label">Visão por domínio</p>
+                <h3>Identifique onde concentrar estímulos</h3>
+                <p>Barras de progresso separadas por Social/Emocional, Linguagem, Cognitivo e Motor facilitam o planejamento terapêutico e a conversa com escola e pediatra.</p>
+              </div>
+              <div class="lp-bento-visual">
+                <div class="lp-mockup-domains" style="margin-top:0">
+                  <div class="lp-mini-domain">
+                    <div class="lp-mini-domain-head"><span>Social</span><span>4/4</span></div>
+                    <div class="lp-mini-track"><div class="lp-mini-fill" style="width:100%;background:#db6fa7"></div></div>
+                  </div>
+                  <div class="lp-mini-domain">
+                    <div class="lp-mini-domain-head"><span>Linguagem</span><span>3/4</span></div>
+                    <div class="lp-mini-track"><div class="lp-mini-fill" style="width:75%;background:#5e9eea"></div></div>
+                  </div>
+                  <div class="lp-mini-domain">
+                    <div class="lp-mini-domain-head"><span>Cognitivo</span><span>3/3</span></div>
+                    <div class="lp-mini-track"><div class="lp-mini-fill" style="width:100%;background:#967ce5"></div></div>
+                  </div>
+                  <div class="lp-mini-domain">
+                    <div class="lp-mini-domain-head"><span>Motor</span><span>3/4</span></div>
+                    <div class="lp-mini-track"><div class="lp-mini-fill" style="width:75%;background:#45bfa8"></div></div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="lp-bento-card span-7">
+              <div>
+                <p class="section-label">Gestão clínica & equipes</p>
+                <h3>Prontuário organizado com alertas de atenção</h3>
+                <p>Cadastre pacientes com data de nascimento, responsável e observações iniciais. Sinalize alertas de preocupação ou perda de habilidade adquirida e gerencie múltiplos profissionais em clínicas.</p>
+              </div>
+              <div class="lp-bento-visual">
+                <div class="pill-row">
+                  <span class="pill violet">Busca rápida por paciente</span>
+                  <span class="pill green">Sugestão automática de idade</span>
+                  <span class="pill amber">Alerta de preocupação</span>
+                  <span class="pill coral">Sinalização de perda de habilidade</span>
+                  <span class="pill muted">Painel gestor para clínicas</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. DEGUSTAÇÃO INTERATIVA DAS 12 FAIXAS -->
+      <section class="lp-band white" id="checklists">
+        <div class="lp-container">
+          <div class="lp-section-head centered">
+            <p class="section-label">Explore na prática</p>
+            <h2>Conheça os checklists disponíveis de 2 meses a 5 anos.</h2>
+            <p class="lead">
+              Selecione qualquer faixa etária abaixo para visualizar exemplos reais dos marcos avaliados em cada área do desenvolvimento.
+            </p>
+          </div>
+
+          <div class="lp-explorer-shell">
+            <div class="lp-age-pills" role="group" aria-label="Selecionar faixa etária para visualização">
+              ${AGE_GROUPS.map(
+                (group) => `
+                  <button
+                    class="lp-age-pill ${Number(state.lpSelectedAge) === Number(group.value) ? "active" : ""}"
+                    type="button"
+                    data-lp-age="${group.value}"
+                    aria-pressed="${Number(state.lpSelectedAge) === Number(group.value) ? "true" : "false"}"
+                  >${group.label}</button>
+                `
+              ).join("")}
+            </div>
+            <div id="lp-explorer-content">
+              ${buildLpExplorerHtml(state.lpSelectedAge)}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. PLANOS E MONETIZAÇÃO -->
+      <section class="lp-band tint" id="planos">
+        <div class="lp-container">
+          <div class="lp-section-head centered">
+            <p class="section-label">Planos e acesso profissional</p>
+            <h2>Comece testando gratuitamente. Evolua quando seu consultório precisar.</h2>
+            <p class="lead">
+              Transparência desde o primeiro dia. Solicite seu acesso profissional e tenha seu ambiente liberado com onboarding guiado.
+            </p>
+          </div>
+
+          <div class="lp-pricing-grid">
+            <article class="lp-plan-card">
+              <div>
+                <h3 class="lp-plan-name">Avaliação Avulsa</h3>
+                <p class="lp-plan-desc">Ideal para conhecer a metodologia ou aplicar uma avaliação rápida sem salvar histórico.</p>
+                <div class="lp-plan-price">
+                  <strong>R$ 0</strong>
+                  <span>/ sempre gratuito</span>
+                </div>
+                <p class="lp-plan-note">Sem cadastro e sem cartão</p>
+                <ul class="lp-plan-features">
+                  <li>Acesso às 12 faixas etárias (2m a 5 anos)</li>
+                  <li>Cálculo imediato por domínio</li>
+                  <li>Resumo imprimível em PDF</li>
+                  <li>Compartilhamento formatado no WhatsApp</li>
+                </ul>
+              </div>
+              <button class="secondary-button" type="button" data-action="start-guest">Fazer avaliação agora</button>
+            </article>
+
+            <article class="lp-plan-card featured">
+              <span class="lp-plan-badge">Mais escolhido · Acesso Fundador</span>
+              <div>
+                <h3 class="lp-plan-name">Consultório Individual</h3>
+                <p class="lp-plan-desc">Para psicólogos(as), neuropsicólogos, fonoaudiólogos e terapeutas infantis.</p>
+                <div class="lp-plan-price">
+                  <strong>R$ 59</strong>
+                  <span>/ mês</span>
+                </div>
+                <p class="lp-plan-note">Condição de lançamento · 7 dias de teste guiado</p>
+                <ul class="lp-plan-features">
+                  <li>Pacientes e avaliações ilimitados em nuvem</li>
+                  <li>Linha do tempo longitudinal por criança</li>
+                  <li>Comparativo automático de marcos conquistados</li>
+                  <li>Gráficos por área do desenvolvimento</li>
+                  <li>Identificação com seu CRP e isolamento RLS</li>
+                  <li>Arquivamento, busca e edição de histórico</li>
+                </ul>
+              </div>
+              <button class="primary-button" type="button" data-open-lead="Consultório Individual (R$ 59/mês)">Solicitar acesso fundador</button>
+            </article>
+
+            <article class="lp-plan-card">
+              <div>
+                <h3 class="lp-plan-name">Clínica & Equipe</h3>
+                <p class="lp-plan-desc">Para clínicas multidisciplinares e equipes de intervenção precoce ou ABA.</p>
+                <div class="lp-plan-price">
+                  <strong>R$ 199</strong>
+                  <span>/ mês (até 5 prof.)</span>
+                </div>
+                <p class="lp-plan-note">Planos maiores sob medida</p>
+                <ul class="lp-plan-features">
+                  <li>Tudo do plano Consultório Individual</li>
+                  <li>Painel administrativo para gestão da equipe</li>
+                  <li>Criação, bloqueio e redefinição de acessos</li>
+                  <li>Troca obrigatória de senha no 1º login</li>
+                  <li>Padronização das devolutivas da clínica</li>
+                  <li>Suporte prioritário no onboarding</li>
+                </ul>
+              </div>
+              <button class="secondary-button" type="button" data-open-lead="Clínica & Equipe (R$ 199/mês)">Falar sobre plano clínica</button>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. ÉTICA CLÍNICA, SEGURANÇA & FAQ -->
+      <section class="lp-band white" id="seguranca">
+        <div class="lp-container">
+          <div class="lp-section-head centered">
+            <p class="section-label">Ética, privacidade & confiança</p>
+            <h2>Construído com respeito ao rigor clínico e à LGPD.</h2>
+            <p class="lead">
+              Sabemos que dados de crianças exigem responsabilidade máxima tanto na condução técnica quanto na proteção digital.
+            </p>
+          </div>
+
+          <div class="lp-security-grid">
+            <article class="lp-security-card">
+              <div class="lp-security-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3>Isolamento total por profissional</h3>
+              <p>Políticas de segurança em nível de linha (RLS) garantem que cada profissional acesse exclusivamente seus próprios prontuários e avaliações.</p>
+            </article>
+            <article class="lp-security-card">
+              <div class="lp-security-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <h3>Controle de acesso seguro</h3>
+              <p>Contas profissionais contam com autenticação criptografada, bloqueio instantâneo pelo gestor e troca obrigatória de senha definitiva no primeiro acesso.</p>
+            </article>
+            <article class="lp-security-card">
+              <div class="lp-security-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              </div>
+              <h3>Enquadramento ético transparente</h3>
+              <p>Os resumos reforçam claramente o caráter observacional e psicoeducativo do checklist CDC, sem substituir testes restritos ou diagnóstico profissional.</p>
+            </article>
+          </div>
+
+          <div class="lp-faq-wrap">
+            <div class="lp-section-head centered" style="margin-bottom:28px">
+              <p class="section-label">Perguntas frequentes</p>
+              <h2>Dúvidas comuns antes de começar</h2>
+            </div>
+            <div class="lp-faq-list">
+              <details class="lp-faq-item" open>
+                <summary>O Marcos substitui testes psicológicos restritos do SATEPSI ou faz diagnóstico?</summary>
+                <div class="lp-faq-answer">
+                  Não. O Marcos é uma ferramenta estruturada de acompanhamento observacional e psicoeducação baseada nos marcos do desenvolvimento do CDC (“Learn the Signs. Act Early.”). Ele apoia o registro longitudinal e a comunicação clara com famílias e escolas, complementando — nunca substituindo — a avaliação clínica ou instrumentos padronizados privativos.
+                </div>
+              </details>
+              <details class="lp-faq-item">
+                <summary>Apenas psicólogos podem utilizar a plataforma?</summary>
+                <div class="lp-faq-answer">
+                  Não. Embora o ambiente possua suporte a registro de CRP e tenha sido desenhado com forte foco em psicologia infantil e neuropsicologia, o Marcos também atende fonoaudiólogos, terapeutas ocupacionais, psicopedagogos, pediatras e clínicas multidisciplinares de desenvolvimento infantil.
+                </div>
+              </details>
+              <details class="lp-faq-item">
+                <summary>Como funciona a liberação do meu acesso após solicitar o plano?</summary>
+                <div class="lp-faq-answer">
+                  Após preencher a solicitação de acesso profissional, nossa equipe entra em contato rapidamente para ativar sua conta. Você recebe seu login com senha temporária e, no primeiro acesso, define imediatamente sua senha definitiva pessoal para começar a cadastrar seus pacientes.
+                </div>
+              </details>
+              <details class="lp-faq-item">
+                <summary>Posso preencher durante a sessão pelo celular ou tablet?</summary>
+                <div class="lp-faq-answer">
+                  Sim. Toda a interface é 100% responsiva e otimizada para toque em celulares, tablets e computadores. Você pode marcar as respostas junto aos pais na sala de atendimento ou ao final da sessão e gerar o PDF ou mensagem de WhatsApp na mesma hora.
+                </div>
+              </details>
+              <details class="lp-faq-item">
+                <summary>Os dados das crianças ficam visíveis para outros profissionais?</summary>
+                <div class="lp-faq-answer">
+                  Nunca. Cada profissional possui isolamento completo garantido por políticas de Row Level Security (RLS) no banco de dados. Seus pacientes, datas de nascimento, observações e históricos de evolução são acessíveis apenas com as suas credenciais autenticadas.
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. CTA FINAL DARK -->
+      <section class="lp-final-band">
+        <div class="lp-container">
+          <div class="lp-final-card">
+            <p class="section-label">Comece hoje mesmo</p>
+            <h2>Leve mais clareza para o acompanhamento das famílias que você atende.</h2>
+            <p class="lead">
+              Experimente a avaliação demonstrativa agora ou solicite seu acesso profissional para organizar toda a evolução clínica dos seus pacientes.
+            </p>
+            <div class="button-row">
+              <button class="primary-button lp-cta-lg" type="button" ${primaryAttr}>${primaryLabel}</button>
+              <button class="secondary-button lp-cta-lg" type="button" data-action="start-guest">Testar avaliação gratuita</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   `;
+}
+
+function buildLeadWhatsappText(lead) {
+  return [
+    "Olá! Gostaria de solicitar acesso profissional à plataforma Marcos.",
+    `• Nome: ${lead.full_name}`,
+    `• E-mail: ${lead.email}`,
+    `• WhatsApp: ${lead.whatsapp}`,
+    lead.professional_registry ? `• Registro profissional: ${lead.professional_registry}` : null,
+    `• Área de atuação: ${lead.specialty}`,
+    `• Plano de interesse: ${lead.plan_interest}`,
+    lead.notes ? `• Observações: ${lead.notes}` : null
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function openLeadModal(plan = "Consultório Individual") {
+  state.leadPlan = plan || "Consultório Individual";
+  state.leadSubmitted = null;
+  state.leadError = null;
+  state.leadModalOpen = true;
+  renderLeadModal();
+  setTimeout(() => document.querySelector("#lead-name")?.focus(), 40);
+}
+
+function closeLeadModal() {
+  if (!state.leadModalOpen) return;
+  state.leadModalOpen = false;
+  state.leadSubmitting = false;
+  state.leadError = null;
+  renderLeadModal();
+}
+
+function renderLeadModal() {
+  if (!modalRoot) return;
+  if (!state.leadModalOpen) {
+    modalRoot.innerHTML = "";
+    return;
+  }
+
+  const submitted = state.leadSubmitted;
+  const feedbackHtml = state.leadError
+    ? `<div class="form-alert error" role="alert">${escapeHtml(state.leadError)}</div>`
+    : "";
+
+  modalRoot.innerHTML = `
+    <div class="lp-modal-backdrop" data-close-modal="backdrop" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title">
+      <div class="lp-modal">
+        <div class="lp-modal-head">
+          <div>
+            <p class="section-label">Acesso profissional</p>
+            <h2 id="lead-modal-title">${submitted ? "Solicitação registrada!" : "Solicitar acesso ao Marcos"}</h2>
+          </div>
+          <button class="lp-modal-close" type="button" data-close-modal="button" aria-label="Fechar janela">×</button>
+        </div>
+
+        ${
+          submitted
+            ? `
+              <div class="lp-modal-success">
+                <div class="lp-modal-success-icon" aria-hidden="true">✓</div>
+                <p class="lead" style="margin:0 auto 14px;font-size:15.5px">
+                  Obrigado, <strong>${escapeHtml(submitted.full_name)}</strong>! Recebemos seu interesse no plano <strong>${escapeHtml(submitted.plan_interest)}</strong>.
+                </p>
+                <p class="hint" style="margin-bottom:22px">
+                  ${submitted.savedToDb ? "Seus dados já foram registrados para nossa equipe liberar seu acesso e senha inicial." : "Você pode enviar o resumo da solicitação abaixo para agilizar a liberação imediata da sua conta."}
+                </p>
+                <div class="button-row" style="justify-content:center;margin-top:0">
+                  <button class="primary-button small-btn" type="button" data-action="lead-whatsapp">Agilizar via WhatsApp</button>
+                  <button class="secondary-button small-btn" type="button" data-action="lead-copy">Copiar solicitação</button>
+                  <button class="quiet-button small-btn" type="button" data-close-modal="button">Fechar</button>
+                </div>
+              </div>
+            `
+            : `
+              <p class="hint" style="margin:-8px 0 18px">
+                Preencha seus dados para receber seu acesso com <strong>7 dias de teste guiado</strong> e senha inicial configurada para o seu consultório.
+              </p>
+              ${feedbackHtml}
+              <form id="lead-request-form" class="form-stack">
+                <div class="form-grid">
+                  <div class="field full">
+                    <label for="lead-name">Nome completo <span aria-hidden="true">*</span></label>
+                    <input id="lead-name" type="text" required minlength="2" placeholder="Ex.: Dra. Camila Ferreira" autocomplete="name" />
+                  </div>
+                  <div class="field">
+                    <label for="lead-email">E-mail profissional <span aria-hidden="true">*</span></label>
+                    <input id="lead-email" type="email" required placeholder="voce@consultorio.com" autocomplete="email" />
+                  </div>
+                  <div class="field">
+                    <label for="lead-whatsapp">WhatsApp <span aria-hidden="true">*</span></label>
+                    <input id="lead-whatsapp" type="tel" required minlength="8" placeholder="(11) 99999-0000" autocomplete="tel" />
+                  </div>
+                  <div class="field">
+                    <label for="lead-registry">CRP / Conselho <span class="hint">(opcional)</span></label>
+                    <input id="lead-registry" type="text" placeholder="Ex.: CRP 06/123456" />
+                  </div>
+                  <div class="field">
+                    <label for="lead-specialty">Área de atuação</label>
+                    <select id="lead-specialty">
+                      <option value="Psicologia Infantil">Psicologia Infantil</option>
+                      <option value="Neuropsicologia">Neuropsicologia</option>
+                      <option value="Fonoaudiologia / TO / Psicopedagogia">Fonoaudiologia / TO / Psicopedagogia</option>
+                      <option value="Clínica Multidisciplinar / Coordenação">Clínica Multidisciplinar / Coordenação</option>
+                    </select>
+                  </div>
+                  <div class="field full">
+                    <label for="lead-plan">Plano de interesse</label>
+                    <select id="lead-plan">
+                      <option value="Consultório Individual (R$ 59/mês)" ${state.leadPlan.includes("Individual") ? "selected" : ""}>Consultório Individual — R$ 59/mês (Acesso Fundador)</option>
+                      <option value="Clínica & Equipe (R$ 199/mês)" ${state.leadPlan.includes("Clínica") ? "selected" : ""}>Clínica & Equipe — a partir de R$ 199/mês</option>
+                    </select>
+                  </div>
+                  <div class="field full">
+                    <label for="lead-notes">Como você pretende usar o Marcos? <span class="hint">(opcional)</span></label>
+                    <textarea id="lead-notes" style="min-height:76px" placeholder="Ex.: número aproximado de pacientes infantis ou dúvidas sobre a plataforma..."></textarea>
+                  </div>
+                </div>
+                <div class="bottom-actions" style="margin-top:8px">
+                  <button class="quiet-button" type="button" data-close-modal="button">Cancelar</button>
+                  <button class="primary-button" type="submit" ${state.leadSubmitting ? "disabled" : ""}>
+                    ${state.leadSubmitting ? "Enviando solicitação..." : "Solicitar meu acesso"}
+                  </button>
+                </div>
+              </form>
+            `
+        }
+      </div>
+    </div>
+  `;
+
+  document.querySelector("#lead-request-form")?.addEventListener("submit", handleLeadSubmit);
+}
+
+async function handleLeadSubmit(event) {
+  event.preventDefault();
+  const payload = {
+    full_name: document.querySelector("#lead-name")?.value.trim() || "",
+    email: (document.querySelector("#lead-email")?.value.trim() || "").toLowerCase(),
+    whatsapp: document.querySelector("#lead-whatsapp")?.value.trim() || "",
+    professional_registry: document.querySelector("#lead-registry")?.value.trim() || "",
+    specialty: document.querySelector("#lead-specialty")?.value || "Psicologia Infantil",
+    plan_interest: document.querySelector("#lead-plan")?.value || state.leadPlan,
+    notes: document.querySelector("#lead-notes")?.value.trim() || ""
+  };
+
+  if (payload.full_name.length < 2 || !payload.email.includes("@") || payload.whatsapp.length < 8) {
+    state.leadError = "Preencha nome completo, e-mail válido e WhatsApp para continuar.";
+    renderLeadModal();
+    return;
+  }
+
+  state.leadSubmitting = true;
+  state.leadError = null;
+  renderLeadModal();
+
+  let savedToDb = false;
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("access_leads").insert(payload);
+      if (!error) savedToDb = true;
+    } catch {
+      // Fallback gracioso caso a migration ainda não tenha sido aplicada.
+    }
+  }
+
+  try {
+    const existing = JSON.parse(localStorage.getItem("marcos_access_leads") || "[]");
+    existing.unshift({ ...payload, created_at: new Date().toISOString(), savedToDb });
+    localStorage.setItem("marcos_access_leads", JSON.stringify(existing.slice(0, 20)));
+  } catch {
+    // Ignorar restrições de storage do navegador.
+  }
+
+  state.leadSubmitting = false;
+  state.leadSubmitted = { ...payload, savedToDb };
+  showToast("Solicitação de acesso registrada com sucesso!", "success");
+  renderLeadModal();
 }
 
 function renderAuth() {
@@ -744,6 +1449,42 @@ function renderSuperadmin() {
         <h3>Profissionais cadastrados (${state.professionals.length})</h3>
         ${listHtml}
       </section>
+
+      ${
+        state.leads.length
+          ? `
+            <section style="margin-top:34px">
+              <h3>Solicitações de acesso da Landing Page (${state.leads.length})</h3>
+              <div class="pro-list">
+                ${state.leads
+                  .map(
+                    (lead) => `
+                    <article class="pro-row">
+                      <div class="pro-info">
+                        <div class="pro-name">
+                          <span>${escapeHtml(lead.full_name)}</span>
+                          <span class="pill violet">${escapeHtml(lead.plan_interest)}</span>
+                          <span class="pill muted">${escapeHtml(lead.specialty)}</span>
+                        </div>
+                        <div class="pro-sub">
+                          ${escapeHtml(lead.email)} · WhatsApp: ${escapeHtml(lead.whatsapp)}
+                          ${lead.professional_registry ? ` · ${escapeHtml(lead.professional_registry)}` : ""}
+                          · ${formatDateBr(lead.created_at)}
+                        </div>
+                        ${lead.notes ? `<div class="pro-sub">Obs.: ${escapeHtml(lead.notes)}</div>` : ""}
+                      </div>
+                      <div class="pro-actions">
+                        <button class="secondary-button small-btn" type="button" data-prefill-lead="${lead.id}">Preencher cadastro</button>
+                      </div>
+                    </article>
+                  `
+                  )
+                  .join("")}
+              </div>
+            </section>
+          `
+          : ""
+      }
     </section>
   `;
 
@@ -1514,6 +2255,7 @@ async function handleAction(action) {
     state.patients = [];
     state.assessments = [];
     state.professionals = [];
+    state.leads = [];
     state.lastCredentials = null;
     resetAssessmentDraft(null);
     state.screen = "home";
@@ -1583,6 +2325,14 @@ async function handleAction(action) {
   }
   if (action === "pdf") { window.print(); return; }
   if (action === "whatsapp") { window.open(`https://wa.me/?text=${encodeURIComponent(textSummary())}`, "_blank", "noopener"); return; }
+  if (action === "lead-whatsapp" && state.leadSubmitted) {
+    window.open(`https://wa.me/?text=${encodeURIComponent(buildLeadWhatsappText(state.leadSubmitted))}`, "_blank", "noopener");
+    return;
+  }
+  if (action === "lead-copy" && state.leadSubmitted) {
+    navigator.clipboard?.writeText(buildLeadWhatsappText(state.leadSubmitted)).then(() => showToast("Solicitação copiada!", "success"));
+    return;
+  }
   if (action === "copy") {
     navigator.clipboard?.writeText(textSummary()).then(() => {
       const button = document.querySelector('[data-action="copy"]');
@@ -1614,7 +2364,73 @@ function loadAssessmentIntoDraft(assessment, targetScreen) {
   render();
 }
 
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.leadModalOpen) {
+    closeLeadModal();
+  }
+});
+
 document.addEventListener("click", (event) => {
+  const closeModal = event.target.closest("[data-close-modal]");
+  if (closeModal) {
+    if (closeModal.dataset.closeModal === "button" || event.target === closeModal) {
+      closeLeadModal();
+      return;
+    }
+  }
+
+  const openLead = event.target.closest("[data-open-lead]");
+  if (openLead) {
+    openLeadModal(openLead.dataset.openLead);
+    return;
+  }
+
+  const lpAge = event.target.closest("[data-lp-age]");
+  if (lpAge) {
+    state.lpSelectedAge = Number(lpAge.dataset.lpAge) || 24;
+    updateLpExplorer();
+    return;
+  }
+
+  const startGuestAge = event.target.closest("[data-start-guest-age]");
+  if (startGuestAge) {
+    resetAssessmentDraft(null);
+    state.age = String(startGuestAge.dataset.startGuestAge);
+    state.screen = "profile";
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
+  const lpScroll = event.target.closest("[data-lp-scroll]");
+  if (lpScroll) {
+    event.preventDefault();
+    const targetId = lpScroll.dataset.lpScroll;
+    if (state.screen !== "home") {
+      state.screen = "home";
+      render();
+    }
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const prefillLead = event.target.closest("[data-prefill-lead]");
+  if (prefillLead) {
+    const lead = state.leads.find((l) => l.id === prefillLead.dataset.prefillLead);
+    if (lead) {
+      const nameEl = document.querySelector("#pro-name");
+      const crpEl = document.querySelector("#pro-crp");
+      const emailEl = document.querySelector("#pro-email");
+      if (nameEl) nameEl.value = lead.full_name || "";
+      if (crpEl) crpEl.value = lead.professional_registry || "";
+      if (emailEl) emailEl.value = lead.email || "";
+      nameEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+      showToast("Dados preenchidos no formulário de cadastro.", "info");
+    }
+    return;
+  }
+
   const adminReset = event.target.closest("[data-admin-reset]");
   if (adminReset) { handleAdminResetPassword(adminReset.dataset.adminReset); return; }
 
@@ -1733,6 +2549,7 @@ async function init() {
       state.patients = [];
       state.assessments = [];
       state.professionals = [];
+      state.leads = [];
       state.lastCredentials = null;
       if (["dashboard", "patient-form", "patient-detail", "superadmin", "change-password"].includes(state.screen)) {
         state.screen = "home";

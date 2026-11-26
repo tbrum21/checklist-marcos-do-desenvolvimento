@@ -4,27 +4,170 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f6f8fb" />
-    <title>Marcos — acompanhamento do desenvolvimento</title>
+    <title>Marcos — Plataforma Clínica de Acompanhamento do Desenvolvimento Infantil</title>
+    <meta
+      name="description"
+      content="Acompanhe marcos do desenvolvimento infantil de 2 meses a 5 anos sessão a sessão, compare conquistas automaticamente e entregue resumos claros em PDF ou WhatsApp para a família. Baseado no guia CDC Learn the Signs. Act Early."
+    />
+    <meta
+      name="keywords"
+      content="marcos do desenvolvimento infantil, psicologia infantil, acompanhamento clínico, checklist CDC, neurodesenvolvimento, prontuário infantil, evolução clínica"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:site_name" content="Marcos" />
+    <meta property="og:title" content="Marcos — Acompanhamento Clínico do Desenvolvimento Infantil" />
+    <meta
+      property="og:description"
+      content="Transforme observações clínicas em evolução visível. 12 faixas etárias, comparativo longitudinal entre sessões e relatórios acolhedores em PDF e WhatsApp."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Marcos — Desenvolvimento Infantil de 0 a 5 anos" />
+    <meta
+      name="twitter:description"
+      content="Plataforma clínica baseada no CDC para psicólogos e equipes do desenvolvimento infantil acompanharem marcos sessão a sessão."
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%236558d8'/%3E%3Crect x='7' y='19' width='4.5' height='6' rx='2' fill='%23ffffff' fill-opacity='.65'/%3E%3Crect x='13.75' y='14' width='4.5' height='11' rx='2' fill='%23ffffff' fill-opacity='.85'/%3E%3Crect x='20.5' y='9' width='4.5' height='16' rx='2' fill='%23ffffff'/%3E%3Ccircle cx='22.75' cy='6.2' r='2.1' fill='%2375c9b0'/%3E%3C/svg%3E"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Marcos",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Web",
+        "inLanguage": "pt-BR",
+        "description": "Plataforma web para psicólogos infantis e equipes do desenvolvimento acompanharem marcos do desenvolvimento de 2 meses a 5 anos com histórico longitudinal e relatórios para a família.",
+        "offers": [
+          {
+            "@type": "Offer",
+            "name": "Avaliação Avulsa",
+            "price": "0",
+            "priceCurrency": "BRL"
+          },
+          {
+            "@type": "Offer",
+            "name": "Consultório Individual",
+            "price": "59",
+            "priceCurrency": "BRL"
+          }
+        ]
+      }
+    </script>
   </head>
-  <body>
-    <main class="app-shell">
+  <body class="is-landing">
+    <div class="site-header-bar">
       <header class="site-header" aria-label="Cabeçalho">
-        <a class="brand" href="#inicio" data-action="brand" aria-label="Marcos, início"><span class="brand-mark">m</span>marcos</a>
-        <nav class="header-actions" id="header-actions" aria-label="Ações principais"></nav>
+        <a class="brand" href="#inicio" data-action="brand" aria-label="Marcos, início">
+          <span class="brand-mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="14" width="4.2" height="7" rx="2" fill="currentColor" fill-opacity="0.6" />
+              <rect x="9.9" y="9.5" width="4.2" height="11.5" rx="2" fill="currentColor" fill-opacity="0.82" />
+              <rect x="16.8" y="5" width="4.2" height="16" rx="2" fill="currentColor" />
+              <circle cx="18.9" cy="2.6" r="1.9" fill="#75c9b0" />
+            </svg>
+          </span>
+          <span class="brand-text">marcos</span>
+        </a>
+        <nav class="header-actions" id="header-actions" aria-label="Ações principais">
+          <div class="header-nav-links">
+            <a class="nav-link" href="#recursos">Recursos</a>
+            <a class="nav-link" href="#checklists">Checklists</a>
+            <a class="nav-link" href="#planos">Planos</a>
+            <a class="nav-link" href="#seguranca">Segurança</a>
+          </div>
+          <button class="secondary-button small-btn" type="button" data-action="go-auth">Entrar</button>
+          <button class="primary-button small-btn" type="button" data-open-lead="Consultório Individual">Solicitar acesso</button>
+        </nav>
       </header>
+    </div>
 
-      <div id="toast-region" class="toast-region" aria-live="assertive"></div>
-      <section id="app" aria-live="polite"></section>
+    <div id="toast-region" class="toast-region" aria-live="assertive"></div>
+    <div id="modal-root" aria-live="polite"></div>
 
-      <footer class="site-footer">
-        <p>Baseado nos checklists “Learn the Signs. Act Early.” do CDC, em português.</p>
-        <p>Ferramenta de acompanhamento clínico e familiar. Não substitui avaliação, triagem ou diagnóstico profissional.</p>
-      </footer>
+    <main class="app-shell">
+      <section id="app" aria-live="polite">
+        <div class="lp-root">
+          <section class="lp-hero-band" id="inicio">
+            <div class="lp-container">
+              <div class="lp-hero">
+                <div class="lp-hero-copy">
+                  <div class="lp-badge">
+                    <span class="lp-badge-dot" aria-hidden="true"></span>
+                    Plataforma Clínica · Desenvolvimento Infantil (0 a 5 anos)
+                  </div>
+                  <h1>Transforme observações clínicas em evolução visível.</h1>
+                  <p class="lead">
+                    Acompanhe os marcos do desenvolvimento de cada paciente sessão a sessão, compare conquistas automaticamente e entregue relatórios acolhedores em PDF ou WhatsApp para a família em menos de 3 minutos.
+                  </p>
+                  <div class="button-row">
+                    <button class="primary-button lp-cta-lg" type="button" data-open-lead="Consultório Individual">
+                      Quero usar no meu consultório
+                    </button>
+                    <button class="secondary-button lp-cta-lg" type="button" data-action="start-guest">
+                      Fazer avaliação demonstrativa
+                    </button>
+                  </div>
+                  <ul class="lp-hero-checks" aria-label="Principais garantias">
+                    <li>Baseado no CDC (Act Early)</li>
+                    <li>Teste gratuito sem cadastro</li>
+                    <li>Sigilo e isolamento por CRP</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
     </main>
+
+    <div class="site-footer-wrap">
+      <footer class="site-footer">
+        <div class="footer-grid">
+          <div class="footer-brand-col">
+            <a class="brand" href="#inicio" data-action="brand" aria-label="Marcos, início">
+              <span class="brand-mark" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="14" width="4.2" height="7" rx="2" fill="currentColor" fill-opacity="0.6" />
+                  <rect x="9.9" y="9.5" width="4.2" height="11.5" rx="2" fill="currentColor" fill-opacity="0.82" />
+                  <rect x="16.8" y="5" width="4.2" height="16" rx="2" fill="currentColor" />
+                  <circle cx="18.9" cy="2.6" r="1.9" fill="#75c9b0" />
+                </svg>
+              </span>
+              <span class="brand-text">marcos</span>
+            </a>
+            <p class="footer-tagline">
+              Acompanhamento longitudinal dos marcos do desenvolvimento infantil para psicólogos, clínicas e equipes de intervenção precoce.
+            </p>
+          </div>
+          <div class="footer-col">
+            <h4>Plataforma</h4>
+            <a href="#recursos" data-lp-scroll="recursos">Recursos clínicos</a>
+            <a href="#checklists" data-lp-scroll="checklists">Explorar 12 faixas etárias</a>
+            <a href="#planos" data-lp-scroll="planos">Planos e acesso</a>
+            <a href="#seguranca" data-lp-scroll="seguranca">Ética e privacidade</a>
+          </div>
+          <div class="footer-col">
+            <h4>Acesso</h4>
+            <button type="button" class="footer-link-btn" data-action="go-auth">Entrar no consultório</button>
+            <button type="button" class="footer-link-btn" data-action="start-guest">Avaliação rápida gratuita</button>
+            <button type="button" class="footer-link-btn" data-open-lead="Consultório Individual">Solicitar acesso profissional</button>
+            <button type="button" class="footer-link-btn" data-open-lead="Clínica & Equipe">Planos para clínicas</button>
+          </div>
+        </div>
+        <div class="footer-legal">
+          <p>Baseado nos checklists “Learn the Signs. Act Early.” do CDC (Centers for Disease Control and Prevention), em português.</p>
+          <p>Ferramenta de acompanhamento observacional e psicoeducação clínica. Não substitui avaliação diagnóstica, triagem padronizada ou testes psicológicos restritos.</p>
+        </div>
+      </footer>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
     <script src="./config.js"></script>

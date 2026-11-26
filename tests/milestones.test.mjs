@@ -99,3 +99,24 @@ test("app.js enforces login-only auth, superadmin panel, and first-access passwo
   assert.match(js, /must_change_password/);
   assert.match(js, /admin_create_professional/);
 });
+
+test("landing page includes SEO metadata, interactive age explorer, pricing and lead capture modal", () => {
+  const html = fs.readFileSync(path.resolve("index.html"), "utf8");
+  const css = fs.readFileSync(path.resolve("styles.css"), "utf8");
+  const js = fs.readFileSync(path.resolve("app.js"), "utf8");
+  assert.match(html, /meta\s+name="description"/);
+  assert.match(html, /property="og:title"/);
+  assert.match(html, /id="modal-root"/);
+  const ldMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  assert.ok(ldMatch, "JSON-LD script block must exist");
+  const ld = JSON.parse(ldMatch[1]);
+  assert.equal(ld["@type"], "SoftwareApplication");
+  const openBraces = (css.match(/\{/g) || []).length;
+  const closeBraces = (css.match(/\}/g) || []).length;
+  assert.equal(openBraces, closeBraces, "CSS braces must be balanced");
+  assert.match(js, /function buildLpExplorerHtml\(/);
+  assert.match(js, /function openLeadModal\(/);
+  assert.match(js, /id="planos"/);
+  assert.match(js, /id="seguranca"/);
+  assert.match(js, /access_leads/);
+});
